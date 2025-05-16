@@ -70,7 +70,6 @@ SERPAPI_API_KEY=your_serpapi_key
 ```bash
 streamlit run src/app.py
 ```
-Visit [http://localhost:8501](http://localhost:8501) in your browser.
 
 ---
 
