@@ -130,11 +130,6 @@ Developed by [Abid Hossain](https://www.abidhossain.me)
 
 ---
 
-## Example Usage & Screenshots
-*Coming soon!*
-
----
-
 ## Best Practices & Tips
 - Always use a virtual environment.
 - Use Python 3.11 for best compatibility.
