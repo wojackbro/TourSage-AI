@@ -371,20 +371,30 @@ def process_document(file, hf_client, vector_store, progress_bar):
 
 def is_junk_tour_name(name):
     import re
-    if not name or name.strip() in {'"""', "''", ")", "(", "*", "-", "_", "", "The provided code defines"}:
+    if not name:
         return True
-    if re.match(r'^[^a-zA-Z0-9]+$', name):  # only symbols
+    name = name.strip()
+    # Only symbols or quotes or brackets
+    if re.match(r'^[^a-zA-Z0-9]+$', name):
         return True
-    if len(name.strip()) < 3:
+    # Too short and not alphanumeric
+    if len(name) < 8 and not re.search(r'[a-zA-Z0-9]', name):
         return True
-    junk_patterns = [
-        r'def ', r'import ', r'pytest', r'FILEPATH', r'class ', r'assert', r'provided code', r'function returns',
-        r'\breturn\b', r'\bself\.assert\w+\b', r'\btest_', r'\bmain\b', r'\bExample', r'\bcode to solve',
-        r'\bfunction', r'\bscript', r'\btest case', r'\bprint\('
+    # Starts or ends with quotes/brackets/symbols
+    if re.match(r'^["\'\[\]\{\}\(\)\*\-]+', name) or re.match(r'["\'\[\]\{\}\(\)\*\-]+$', name):
+        return True
+    # Known junk/keywords
+    junk_keywords = [
+        'artist', 'album', 'title', 'release', 'date', 'provided code', 'function', 'test', 'example', 'main',
+        'def ', 'import ', 'class ', 'assert', 'FILEPATH', 'pytest', 'explanation', 'snippet', 'raw', 'json', 'object',
+        'template', 'placeholder', 'parametrize', 'expected'
     ]
-    for pat in junk_patterns:
-        if re.search(pat, name, re.IGNORECASE):
+    for word in junk_keywords:
+        if word in name.lower():
             return True
+    # Patterns like [artist name], {album title}, etc.
+    if re.search(r'\[.*?\]|\{.*?\}|<.*?>|\*', name):
+        return True
     return False
 
 if page == "Add Document":
@@ -480,8 +490,7 @@ else:  # Search Concerts
                     for r in deduped:
                         tour_name_clean = sanitize_output(r.get('tour_name', 'Upcoming Tour'))
                         if is_junk_tour_name(tour_name_clean):
-                            tour_name_clean = 'Upcoming Tour'
-                        # Deduplicate by heading
+                            continue  # SKIP this result entirely
                         if tour_name_clean in unique_headings:
                             continue
                         unique_headings.add(tour_name_clean)
