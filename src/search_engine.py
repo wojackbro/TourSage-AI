@@ -231,107 +231,185 @@ class SearchEngine:
             return None
 
     def search_concerts(self, artist: str, document_processor=None) -> dict:
-        # Broadened queries
-        local_query = f"{artist} tour OR concert 2025 2026"
-        internet_query = f"{artist} concert OR tour 2025 2026 official website"
-        logger.info(f"[DEBUG] Local search query: {local_query}")
-        logger.info(f"[DEBUG] Internet search query: {internet_query}")
-        
-        local_dict_results = []
-        local_error = None
-        internet_error = None  # Ensure this is always initialized
-        
-        # --- Local Vector Search ---
-        if document_processor:
-            try:
-                local_results = document_processor.get_relevant_chunks(local_query, k=5)
-                logger.info(f"[DEBUG] Local search found {len(local_results)} results.")
-                for doc in local_results:
-                    if hasattr(doc, 'page_content'):
-                        info = self._extract_concert_info(doc.page_content)
-                        if info:
-                            info_dict = info.dict() if hasattr(info, 'dict') else dict(info)
-                            info_dict["source_url"] = "Local Document"
-                            info_dict["last_updated"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                            info_dict["confidence_score"] = info_dict.get("confidence_score", 0.9)
-                            local_dict_results.append(info_dict)
-                    elif isinstance(doc, dict):
-                        local_dict_results.append(doc)
-            except Exception as e:
-                local_error = str(e)
-                logger.error(f"[DEBUG] Local search error: {local_error}")
-        else:
-            logger.warning("[DEBUG] No document_processor provided for local search.")
-        
-        # --- Internet Search ---
-        internet_results = []
+        """Search for concert information about an artist."""
         try:
-            from serpapi import GoogleSearch
-            params = {
-                "q": internet_query,
-                "api_key": self.api_key,
-                "num": 10,
-                "engine": "google",
-                "tbm": "nws"
-            }
-            search = GoogleSearch(params)
-            results = search.get_dict()
-            news_results = results.get("news_results", [])
-            logger.info(f"[DEBUG] Internet search found {len(news_results)} news results.")
-            for item in news_results:
-                concert_info = self._extract_concert_info(item.get("title", "") + "\n" + item.get("snippet", ""))
-                if concert_info:
-                    info_dict = concert_info.dict() if hasattr(concert_info, 'dict') else dict(concert_info)
-                    info_dict["source_url"] = item.get("link", "")
-                    info_dict["last_updated"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                    info_dict["confidence_score"] = info_dict.get("confidence_score", 0.5)
-                    internet_results.append(info_dict)
-        except Exception as e:
-            internet_error = str(e)
-            logger.error(f"[DEBUG] Internet search error: {internet_error}")
-        
-        # --- Combine and Deduplicate Results ---
-        combined_results = []
-        seen = set()
-        for result in local_dict_results + internet_results:
-            key = (tuple(result.get("dates", [])), tuple(result.get("venues", [])))
-            if key not in seen:
-                combined_results.append(result)
-                seen.add(key)
-        
-        # --- Debug Output for Results ---
-        logger.info(f"[DEBUG] Combined results count: {len(combined_results)}")
-        logger.info(f"[DEBUG] Local error: {local_error}")
-        logger.info(f"[DEBUG] Internet error: {internet_error}")
-        
-        # --- Fallback and Response ---
-        if combined_results:
-            return {
-                "status": "success",
-                "message": f"Found {len(combined_results)} unique tour information sources for {artist}.",
-                "results": combined_results,
-                "debug": {
-                    "local_query": local_query,
-                    "internet_query": internet_query,
-                    "local_results_count": len(local_dict_results),
-                    "internet_results_count": len(internet_results),
-                    "local_error": local_error,
-                    "internet_error": internet_error
+            # Broadened queries
+            local_query = f"{artist} tour OR concert 2025 2026"
+            internet_query = f"{artist} concert OR tour 2025 2026 official website"
+            logger.info(f"[DEBUG] Local search query: {local_query}")
+            logger.info(f"[DEBUG] Internet search query: {internet_query}")
+            
+            local_dict_results = []
+            local_error = None
+            internet_error = None  # Ensure this is always initialized
+            
+            # --- Local Vector Search ---
+            if document_processor:
+                try:
+                    local_results = document_processor.get_relevant_chunks(local_query, k=5)
+                    logger.info(f"[DEBUG] Local search found {len(local_results)} results.")
+                    for doc in local_results:
+                        if hasattr(doc, 'page_content'):
+                            info = self._extract_concert_info(doc.page_content)
+                            if info:
+                                info_dict = info.dict() if hasattr(info, 'dict') else dict(info)
+                                info_dict["source_url"] = "Local Document"
+                                info_dict["last_updated"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                                info_dict["confidence_score"] = info_dict.get("confidence_score", 0.9)
+                                local_dict_results.append(info_dict)
+                        elif isinstance(doc, dict):
+                            local_dict_results.append(doc)
+                except Exception as e:
+                    local_error = str(e)
+                    logger.error(f"[DEBUG] Local search error: {local_error}")
+            else:
+                logger.warning("[DEBUG] No document_processor provided for local search.")
+            
+            # --- Internet Search ---
+            internet_results = []
+            try:
+                from serpapi import GoogleSearch
+                params = {
+                    "q": internet_query,
+                    "api_key": self.api_key,
+                    "num": 10,
+                    "engine": "google",
+                    "tbm": "nws"
                 }
-            }
-        else:
+                search = GoogleSearch(params)
+                results = search.get_dict()
+                news_results = results.get("news_results", [])
+                logger.info(f"[DEBUG] Internet search found {len(news_results)} news results.")
+                for item in news_results:
+                    concert_info = self._extract_concert_info(item.get("title", "") + "\n" + item.get("snippet", ""))
+                    if concert_info:
+                        info_dict = concert_info.dict() if hasattr(concert_info, 'dict') else dict(concert_info)
+                        info_dict["source_url"] = item.get("link", "")
+                        info_dict["last_updated"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                        info_dict["confidence_score"] = info_dict.get("confidence_score", 0.5)
+                        internet_results.append(info_dict)
+            except Exception as e:
+                internet_error = str(e)
+                logger.error(f"[DEBUG] Internet search error: {internet_error}")
+            
+            # --- Combine and Deduplicate Results ---
+            combined_results = []
+            seen = set()
+            for result in local_dict_results + internet_results:
+                key = (tuple(result.get("dates", [])), tuple(result.get("venues", [])))
+                if key not in seen:
+                    combined_results.append(result)
+                    seen.add(key)
+            
+            # --- Debug Output for Results ---
+            logger.info(f"[DEBUG] Combined results count: {len(combined_results)}")
+            logger.info(f"[DEBUG] Local error: {local_error}")
+            logger.info(f"[DEBUG] Internet error: {internet_error}")
+            
+            # --- Process Results ---
+            processed_results = []
+            for result in combined_results:
+                # Extract tour name
+                tour_name = result.get('tour_name', 'Upcoming Tour')
+                tour_name = self.sanitize_output(tour_name)
+                # Remove code-like lines and artifacts from tour name
+                tour_name = re.sub(r'^if __name__ == .__main__.:.*$', '', tour_name, flags=re.MULTILINE)
+                tour_name = re.sub(r'^python.*$', '', tour_name, flags=re.MULTILINE)
+                tour_name = re.sub(r'^import re.*$', '', tour_name, flags=re.MULTILINE)
+                tour_name = re.sub(r'^\s*$', '', tour_name, flags=re.MULTILINE)
+                tour_name = re.sub(r'^\s*""".*"""$', '', tour_name, flags=re.MULTILINE)
+                tour_name = re.sub(r'^\s*#.*$', '', tour_name, flags=re.MULTILINE)
+                tour_name = re.sub(r'^\s*def .*$', '', tour_name, flags=re.MULTILINE)
+                tour_name = re.sub(r'^\s*class .*$', '', tour_name, flags=re.MULTILINE)
+                tour_name = re.sub(r'^\s*print\(.*\).*$', '', tour_name, flags=re.MULTILINE)
+                tour_name = tour_name.strip()
+                if not tour_name:
+                    tour_name = 'Upcoming Tour'
+                # Extract dates
+                dates = result.get('dates', [])
+                dates = [self.sanitize_output(date) for date in dates]
+                dates = [re.sub(r'^if __name__ == .__main__.:.*$', '', date, flags=re.MULTILINE) for date in dates]
+                dates = [re.sub(r'^python.*$', '', date, flags=re.MULTILINE) for date in dates]
+                dates = [re.sub(r'^import re.*$', '', date, flags=re.MULTILINE) for date in dates]
+                dates = [re.sub(r'^\s*$', '', date, flags=re.MULTILINE) for date in dates]
+                dates = [re.sub(r'^\s*""".*"""$', '', date, flags=re.MULTILINE) for date in dates]
+                dates = [re.sub(r'^\s*#.*$', '', date, flags=re.MULTILINE) for date in dates]
+                dates = [re.sub(r'^\s*def .*$', '', date, flags=re.MULTILINE) for date in dates]
+                dates = [re.sub(r'^\s*class .*$', '', date, flags=re.MULTILINE) for date in dates]
+                dates = [re.sub(r'^\s*print\(.*\).*$', '', date, flags=re.MULTILINE) for date in dates]
+                dates = [date.strip() for date in dates]
+                dates = [date for date in dates if date]
+                # Extract venues
+                venues = result.get('venues', [])
+                venues = [self.sanitize_output(venue) for venue in venues]
+                venues = [re.sub(r'^if __name__ == .__main__.:.*$', '', venue, flags=re.MULTILINE) for venue in venues]
+                venues = [re.sub(r'^python.*$', '', venue, flags=re.MULTILINE) for venue in venues]
+                venues = [re.sub(r'^import re.*$', '', venue, flags=re.MULTILINE) for venue in venues]
+                venues = [re.sub(r'^\s*$', '', venue, flags=re.MULTILINE) for venue in venues]
+                venues = [re.sub(r'^\s*""".*"""$', '', venue, flags=re.MULTILINE) for venue in venues]
+                venues = [re.sub(r'^\s*#.*$', '', venue, flags=re.MULTILINE) for venue in venues]
+                venues = [re.sub(r'^\s*def .*$', '', venue, flags=re.MULTILINE) for venue in venues]
+                venues = [re.sub(r'^\s*class .*$', '', venue, flags=re.MULTILINE) for venue in venues]
+                venues = [re.sub(r'^\s*print\(.*\).*$', '', venue, flags=re.MULTILINE) for venue in venues]
+                venues = [venue.strip() for venue in venues]
+                venues = [venue for venue in venues if venue]
+                # Extract ticket info
+                ticket_info = result.get('ticket_info', '')
+                ticket_info = self.sanitize_output(ticket_info)
+                ticket_info = re.sub(r'^if __name__ == .__main__.:.*$', '', ticket_info, flags=re.MULTILINE)
+                ticket_info = re.sub(r'^python.*$', '', ticket_info, flags=re.MULTILINE)
+                ticket_info = re.sub(r'^import re.*$', '', ticket_info, flags=re.MULTILINE)
+                ticket_info = re.sub(r'^\s*$', '', ticket_info, flags=re.MULTILINE)
+                ticket_info = re.sub(r'^\s*""".*"""$', '', ticket_info, flags=re.MULTILINE)
+                ticket_info = re.sub(r'^\s*#.*$', '', ticket_info, flags=re.MULTILINE)
+                ticket_info = re.sub(r'^\s*def .*$', '', ticket_info, flags=re.MULTILINE)
+                ticket_info = re.sub(r'^\s*class .*$', '', ticket_info, flags=re.MULTILINE)
+                ticket_info = re.sub(r'^\s*print\(.*\).*$', '', ticket_info, flags=re.MULTILINE)
+                ticket_info = ticket_info.strip()
+                processed_results.append({
+                    'tour_name': tour_name,
+                    'dates': dates,
+                    'venues': venues,
+                    'ticket_info': ticket_info,
+                    'last_updated': result.get('last_updated', 'N/A'),
+                    'confidence_score': result.get('confidence_score', 0),
+                    'source_url': result.get('source_url', 'Local Document')
+                })
+            
+            # --- Fallback and Response ---
+            if processed_results:
+                return {
+                    "status": "success",
+                    "message": f"Found {len(processed_results)} unique tour information sources for {artist}.",
+                    "results": processed_results,
+                    "debug": {
+                        "local_query": local_query,
+                        "internet_query": internet_query,
+                        "local_results_count": len(local_dict_results),
+                        "internet_results_count": len(internet_results),
+                        "local_error": local_error,
+                        "internet_error": internet_error
+                    }
+                }
+            else:
+                return {
+                    "status": "error",
+                    "message": f"No relevant tour information found for {artist} in 2025-2026 (checked both local and internet sources).",
+                    "results": [],
+                    "debug": {
+                        "local_query": local_query,
+                        "internet_query": internet_query,
+                        "local_results_count": len(local_dict_results),
+                        "internet_results_count": len(internet_results),
+                        "local_error": local_error,
+                        "internet_error": internet_error
+                    }
+                }
+        except Exception as e:
             return {
                 "status": "error",
-                "message": f"No relevant tour information found for {artist} in 2025-2026 (checked both local and internet sources).",
-                "results": [],
-                "debug": {
-                    "local_query": local_query,
-                    "internet_query": internet_query,
-                    "local_results_count": len(local_dict_results),
-                    "internet_results_count": len(internet_results),
-                    "local_error": local_error,
-                    "internet_error": internet_error
-                }
+                "message": f"Error searching concerts: {str(e)}",
+                "results": []
             }
 
     def remove_code_lines(self, text: str) -> str:

@@ -369,6 +369,24 @@ def process_document(file, hf_client, vector_store, progress_bar):
         """, unsafe_allow_html=True)
         progress_bar.progress(0)
 
+def is_junk_tour_name(name):
+    import re
+    if not name or name.strip() in {'"""', "''", ")", "(", "*", "-", "_", "", "The provided code defines"}:
+        return True
+    if re.match(r'^[^a-zA-Z0-9]+$', name):  # only symbols
+        return True
+    if len(name.strip()) < 3:
+        return True
+    junk_patterns = [
+        r'def ', r'import ', r'pytest', r'FILEPATH', r'class ', r'assert', r'provided code', r'function returns',
+        r'\breturn\b', r'\bself\.assert\w+\b', r'\btest_', r'\bmain\b', r'\bExample', r'\bcode to solve',
+        r'\bfunction', r'\bscript', r'\btest case', r'\bprint\('
+    ]
+    for pat in junk_patterns:
+        if re.search(pat, name, re.IGNORECASE):
+            return True
+    return False
+
 if page == "Add Document":
     st.markdown("""
         <div style='background-color: #ffffff; padding: 2rem; border-radius: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);'>
@@ -458,10 +476,15 @@ else:  # Search Concerts
                             deduped.append(r)
                             seen_keys.add(key)
                     # Show deduped results (cleaned, no summary)
+                    unique_headings = set()
                     for r in deduped:
                         tour_name_clean = sanitize_output(r.get('tour_name', 'Upcoming Tour'))
-                        if not tour_name_clean or tour_name_clean == '"""':
+                        if is_junk_tour_name(tour_name_clean):
                             tour_name_clean = 'Upcoming Tour'
+                        # Deduplicate by heading
+                        if tour_name_clean in unique_headings:
+                            continue
+                        unique_headings.add(tour_name_clean)
                         with st.expander(f"🎵 {artist} - {tour_name_clean}", expanded=False):
                             col1, col2 = st.columns(2)
                             with col1:
